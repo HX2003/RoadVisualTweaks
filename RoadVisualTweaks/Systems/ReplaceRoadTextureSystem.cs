@@ -15,6 +15,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.IO.Ports;
 using Unity.Burst;
 using Unity.Collections;
 using Unity.Entities;
@@ -25,20 +26,19 @@ using static Colossal.AssetPipeline.Importers.DefaultTextureImporter;
 using static Colossal.AssetPipeline.Importers.TextureImporter;
 using static Colossal.IO.AssetDatabase.MaterialLibrary;
 using static Game.Rendering.ManagedBatchSystem;
-using static Game.Tools.ValidationSystem;
-using static Game.UI.NameSystem;
 using static RoadVisualTweaks.Setting;
 using static RoadVisualTweaks.Systems.ReplaceRoadTextureSystem;
 
 namespace RoadVisualTweaks.Systems
 {
     [BurstCompile]
-    public struct ImageBrightnessHueJob : IJobParallelFor
+    public struct ImageBrightnessOpacityHueJob : IJobParallelFor
     {
         [ReadOnly] public NativeArray<Color32> input;
         [WriteOnly] public NativeArray<Color32> output;
 
         public float brightness;
+        public float opacity;
         public float hue;
 
         public void Execute(int i)
@@ -52,7 +52,7 @@ namespace RoadVisualTweaks.Systems
                 (byte)(math.min(co.r * brightness, 255)),
                 (byte)(math.min(co.g * brightness, 255)),
                 (byte)(math.min(co.b * brightness, 255)),
-                c.a
+                (byte)(c.a * opacity)
             );
         }
     }
@@ -95,21 +95,21 @@ namespace RoadVisualTweaks.Systems
 
         public class ConfigurableMaterial
         {
-            public UnityEngine.Material material { get; set; } // reference to the material
-            public UnityEngine.Texture2D vanillaColorTexture { get; set; } // reference to the vanilla texture 
-            public UnityEngine.Texture2D vanillaNormalTexture { get; set; } // reference to the vanilla texture 
-            public float vanillaSmoothness { get; set; }
+            public UnityEngine.Material Material { get; set; } // reference to the material
+            public UnityEngine.Texture2D VanillaColorTexture { get; set; } // reference to the vanilla texture 
+            public UnityEngine.Texture2D VanillaNormalTexture { get; set; } // reference to the vanilla texture 
+            public float VanillaSmoothness { get; set; }
 
             // The color texture is cached temporarily since the user might apply color adjustments to it
 
             public Stopwatch cachedTextureStopWatch; // stopwatch for the cached textures
-            public UnityEngine.Texture2D cachedSourceColorTexture { get; set; } // catched texture which only remain alive for a short duration (when user is tweaking the sliders)
+            public UnityEngine.Texture2D CachedSourceColorTexture { get; set; } // catched texture which only remain alive for a short duration (when user is tweaking the sliders)
 
             // If the adjusted color texture is used, it is finally stored here
-            public UnityEngine.Texture2D generatedColorTexture { get; set; }
+            public UnityEngine.Texture2D GeneratedColorTexture { get; set; }
 
             // If the custom normal texture is used, it is finally stored here
-            public UnityEngine.Texture2D generatedNormalTexture { get; set; }
+            public UnityEngine.Texture2D GeneratedNormalTexture { get; set; }
 
             public bool usesWorldSpace = false; // true for BikePathPavementMiddle300cm, i'm not sure why this material doesn't use the BaseColor
 
@@ -129,7 +129,7 @@ namespace RoadVisualTweaks.Systems
             }
         }
 
-        private Dictionary<string, ConfigurableMaterial> configurableMaterials = new Dictionary<string, ConfigurableMaterial>
+        private Dictionary<string, ConfigurableMaterial> configurableMaterials = new()
         {
             { ConfigurableMaterialNames.CarLane, new ConfigurableMaterial() },
             { ConfigurableMaterialNames.GravelLane, new ConfigurableMaterial() },
@@ -219,7 +219,7 @@ namespace RoadVisualTweaks.Systems
                         {
                             if (material.name.StartsWith("Batch (" + name))
                             {
-                                configurableMaterial.material = material;
+                                configurableMaterial.Material = material;
                                
                                 Mod.log.Info("The following was successfully found");
                                 Mod.log.Info($"->->material name: {material.name}");
@@ -235,7 +235,7 @@ namespace RoadVisualTweaks.Systems
                                     if (colorTexture != null)
                                     {
                                         Mod.log.Info($"->->->color texture name: {colorTexture.name}");
-                                        configurableMaterial.vanillaColorTexture = material.GetTexture("_BaseColorMap") as Texture2D; // Get the texture assigned to _BaseColorMap
+                                        configurableMaterial.VanillaColorTexture = material.GetTexture("_BaseColorMap") as Texture2D; // Get the texture assigned to _BaseColorMap
 
                                         configurableMaterial.usesWorldSpace = false;
                                         //configurableMaterial.vanillaColorTexture = ReadUnreadableTexture(material.GetTexture("_BaseColorMap") as Texture2D); // Get the texture assigned to _BaseColorMap
@@ -248,7 +248,7 @@ namespace RoadVisualTweaks.Systems
                                     if (normalTexture != null)
                                     {
                                         Mod.log.Info($"->->->normal texture name: {normalTexture.name}");
-                                        configurableMaterial.vanillaNormalTexture = material.GetTexture("_NormalMap") as Texture2D; // Get the texture assigned to _NormalMap
+                                        configurableMaterial.VanillaNormalTexture = material.GetTexture("_NormalMap") as Texture2D; // Get the texture assigned to _NormalMap
 
                                         configurableMaterial.usesWorldSpace = false;
                                         //configurableMaterial.vanillaNormalTexture = ReadUnreadableTexture(material.GetTexture("_NormalMap") as Texture2D, true); // Get the texture assigned to _NormalMap
@@ -259,7 +259,7 @@ namespace RoadVisualTweaks.Systems
                                 {
                                     float v = material.GetFloat("_Smoothness");
                                     Mod.log.Info($"->->->smoothness value: {v}");
-                                    configurableMaterial.vanillaSmoothness = v;
+                                    configurableMaterial.VanillaSmoothness = v;
                                 }
 
 
@@ -273,7 +273,7 @@ namespace RoadVisualTweaks.Systems
                                         if (colorTexture != null)
                                         {
                                             Mod.log.Info($"->->->_WorldspaceAlbedo texture name: {colorTexture.name}");
-                                            configurableMaterial.vanillaColorTexture = material.GetTexture("_WorldspaceAlbedo") as Texture2D; // Get the texture assigned to _BaseColorMap
+                                            configurableMaterial.VanillaColorTexture = material.GetTexture("_WorldspaceAlbedo") as Texture2D; // Get the texture assigned to _BaseColorMap
 
                                             //configurableMaterial.vanillaColorTexture = ReadUnreadableTexture(material.GetTexture("_BaseColorMap") as Texture2D); // Get the texture assigned to _BaseColorMap
                                         } 
@@ -285,7 +285,7 @@ namespace RoadVisualTweaks.Systems
                                         if (normalTexture != null)
                                         {
                                             Mod.log.Info($"->->->_WorldspaceNormalMap  texture name: {normalTexture.name}");
-                                            configurableMaterial.vanillaNormalTexture = material.GetTexture("_WorldspaceNormalMap") as Texture2D; // Get the texture assigned to _NormalMap
+                                            configurableMaterial.VanillaNormalTexture = material.GetTexture("_WorldspaceNormalMap") as Texture2D; // Get the texture assigned to _NormalMap
                                             
                                             //configurableMaterial.vanillaNormalTexture = ReadUnreadableTexture(material.GetTexture("_NormalMap") as Texture2D, true); // Get the texture assigned to _NormalMap
                                         }
@@ -395,7 +395,6 @@ namespace RoadVisualTweaks.Systems
         {
             // Note that UpdateMaterialsAndTextures() may also be called by settings
 
-            // This is not optimized, so if user changes the settings, all textures will be regenerated
             foreach (KeyValuePair<string, ConfigurableMaterial> pair in configurableMaterials)
             {
                 string name = pair.Key;
@@ -432,6 +431,7 @@ namespace RoadVisualTweaks.Systems
                         overrideEnable = Mod.MySetting.BusLaneOverrideEnable;
                         textureVariant = Mod.MySetting.BusLaneTextureVariant;
                         textureBrightness = Mod.MySetting.BusLaneTextureBrightness;
+                        textureOpacity = Mod.MySetting.BusLaneTextureOpacity;
                         textureHue = Mod.MySetting.BusLaneTextureHue;
                         textureSmoothness = Mod.MySetting.BusLaneTextureSmoothness;
                     } else if (name == ConfigurableMaterialNames.BikeLane150cm ||
@@ -442,6 +442,7 @@ namespace RoadVisualTweaks.Systems
                         textureVariant = Mod.MySetting.BicycleLaneTextureVariant;
                         textureBrightness = Mod.MySetting.BicycleLaneTextureBrightness;
                         textureHue = Mod.MySetting.BicycleLaneTextureHue;
+                        textureOpacity = Mod.MySetting.BicycleLaneTextureOpacity;
                         textureSmoothness = Mod.MySetting.BicycleLaneTextureSmoothness;
                     }
 
@@ -463,9 +464,9 @@ namespace RoadVisualTweaks.Systems
                         if (!overrideEnable)
                         {
                             // If not enabled, just use the vanilla textures
-                            configurableMaterial.material.SetTexture(normalKey, configurableMaterial.vanillaNormalTexture); // note that some materials do not have a default normal map
-                            configurableMaterial.material.SetTexture(colorKey, configurableMaterial.vanillaColorTexture);
-                            configurableMaterial.material.SetFloat("_Smoothness", configurableMaterial.vanillaSmoothness);
+                            configurableMaterial.Material.SetTexture(normalKey, configurableMaterial.VanillaNormalTexture); // note that some materials do not have a default normal map
+                            configurableMaterial.Material.SetTexture(colorKey, configurableMaterial.VanillaColorTexture);
+                            configurableMaterial.Material.SetFloat("_Smoothness", configurableMaterial.VanillaSmoothness);
                         }
                         else
                         {
@@ -475,14 +476,14 @@ namespace RoadVisualTweaks.Systems
                             {
                                 // Cache is invalid, reload the textures
 
-                                if (configurableMaterial.cachedSourceColorTexture != null)
+                                if (configurableMaterial.CachedSourceColorTexture != null)
                                 {
-                                    UnityEngine.Object.Destroy(configurableMaterial.cachedSourceColorTexture);
+                                    UnityEngine.Object.Destroy(configurableMaterial.CachedSourceColorTexture);
                                 }
 
                                 if (textureVariant == TextureVariantEnum.Vanilla)
                                 {
-                                    configurableMaterial.cachedSourceColorTexture = ReadUnreadableTexture(configurableMaterial.vanillaColorTexture);
+                                    configurableMaterial.CachedSourceColorTexture = ReadUnreadableTexture(configurableMaterial.VanillaColorTexture);
                                 }
                                 else
                                 { // Currently only supports 1 alternative texture
@@ -498,7 +499,7 @@ namespace RoadVisualTweaks.Systems
 
                                     TextureImporter.Texture tempColorTexture = defaultTextureImporter.Import(importSettings, colourFilePath);
                                     // copy the texture as a UnityEngine.Texture2D
-                                    configurableMaterial.cachedSourceColorTexture = (Texture2D)(tempColorTexture.ToUnityTexture());
+                                    configurableMaterial.CachedSourceColorTexture = (Texture2D)(tempColorTexture.ToUnityTexture());
                                     tempColorTexture.Dispose();
                                 }
                             }
@@ -507,9 +508,9 @@ namespace RoadVisualTweaks.Systems
                             if(configurableMaterial.prevTextureVariant != textureVariant)
                             {
 
-                                if (configurableMaterial.generatedNormalTexture != null)
+                                if (configurableMaterial.GeneratedNormalTexture != null)
                                 {
-                                    UnityEngine.Object.Destroy(configurableMaterial.generatedNormalTexture);
+                                    UnityEngine.Object.Destroy(configurableMaterial.GeneratedNormalTexture);
                                 }
 
                                 if (textureVariant != TextureVariantEnum.Vanilla)
@@ -525,8 +526,8 @@ namespace RoadVisualTweaks.Systems
                                     {
                                         TextureImporter.Texture temp2 = defaultTextureImporter.Import(importSettings2, normalFilePath);
 
-                                        configurableMaterial.generatedNormalTexture = (Texture2D)(temp2.ToUnityTexture());
-                                        configurableMaterial.generatedNormalTexture.name = name + "_Normal_custom";
+                                        configurableMaterial.GeneratedNormalTexture = (Texture2D)(temp2.ToUnityTexture());
+                                        configurableMaterial.GeneratedNormalTexture.name = name + "_Normal_custom";
 
                                         temp2.Dispose();
                                     }
@@ -537,21 +538,25 @@ namespace RoadVisualTweaks.Systems
                                 }
                             }
 
-                            NativeArray<Color32> rawColorPixels = configurableMaterial.cachedSourceColorTexture.GetPixelData<Color32>(0);
+                            NativeArray<Color32> rawColorPixels = configurableMaterial.CachedSourceColorTexture.GetPixelData<Color32>(0);
                            
-                            // Always destroy the generatedColorTexture, since we will recreate a new one
-                            if (configurableMaterial.generatedColorTexture != null)
+                            if (configurableMaterial.GeneratedColorTexture == null)
                             {
-                                UnityEngine.Object.Destroy(configurableMaterial.generatedColorTexture);
+                                configurableMaterial.GeneratedColorTexture = new Texture2D(configurableMaterial.CachedSourceColorTexture.width, configurableMaterial.CachedSourceColorTexture.height)
+                                {
+                                    name = name + "_BaseColor_custom"
+                                };
+                            } else {
+                                if ((configurableMaterial.GeneratedColorTexture.width != configurableMaterial.CachedSourceColorTexture.width) ||
+                                    (configurableMaterial.GeneratedColorTexture.height != configurableMaterial.CachedSourceColorTexture.height))
+                                {
+                                    configurableMaterial.GeneratedColorTexture.Reinitialize(configurableMaterial.CachedSourceColorTexture.width, configurableMaterial.CachedSourceColorTexture.height);
+                                }
                             }
 
-                            configurableMaterial.generatedColorTexture = new Texture2D(configurableMaterial.cachedSourceColorTexture.width, configurableMaterial.cachedSourceColorTexture.height);
-                            configurableMaterial.generatedColorTexture.name = name + "_BaseColor_custom";
-
-      
                             int imageLen = rawColorPixels.Length;
 
-                            NativeArray<Color32> output = new NativeArray<Color32>(imageLen, Allocator.TempJob);
+                            NativeArray<Color32> output = new(imageLen, Allocator.TempJob);
 
                             if (name == ConfigurableMaterialNames.BusLane ||
                                 name == ConfigurableMaterialNames.BikeLane150cm ||
@@ -559,11 +564,12 @@ namespace RoadVisualTweaks.Systems
                                 name == ConfigurableMaterialNames.BikePathPavementMiddle300cm ||
                                 name == ConfigurableMaterialNames.BikePathPavement800cm)
                             {
-                                var job = new ImageBrightnessHueJob
+                                var job = new ImageBrightnessOpacityHueJob
                                 {
                                     input = rawColorPixels,
                                     output = output,
                                     brightness = textureBrightness,
+                                    opacity = textureOpacity,
                                     hue = textureHue
                                 };
 
@@ -586,35 +592,34 @@ namespace RoadVisualTweaks.Systems
 
                             Color32[] modifiedPixels = output.ToArray();
 
-                            configurableMaterial.generatedColorTexture.SetPixels32(modifiedPixels);
-                            configurableMaterial.generatedColorTexture.Apply(true);
+                            configurableMaterial.GeneratedColorTexture.SetPixels32(modifiedPixels);
+                            configurableMaterial.GeneratedColorTexture.Apply(true);
 
                             output.Dispose();
 
                             if (textureVariant == TextureVariantEnum.Vanilla)
                             {
-                                configurableMaterial.material.SetTexture(normalKey, configurableMaterial.vanillaNormalTexture); // note that some materials do not have a default normal map
+                                configurableMaterial.Material.SetTexture(normalKey, configurableMaterial.VanillaNormalTexture); // note that some materials do not have a default normal map
                             }
                             else
                             {
-                                configurableMaterial.material.SetTexture(normalKey, configurableMaterial.generatedNormalTexture); // note that some materials do not have a default normal map
+                                configurableMaterial.Material.SetTexture(normalKey, configurableMaterial.GeneratedNormalTexture); // note that some materials do not have a default normal map
                             }
   
-                            configurableMaterial.material.SetTexture(colorKey, configurableMaterial.generatedColorTexture);
-                            configurableMaterial.material.SetFloat("_Smoothness", textureSmoothness);
+                            configurableMaterial.Material.SetTexture(colorKey, configurableMaterial.GeneratedColorTexture);
+                            configurableMaterial.Material.SetFloat("_Smoothness", textureSmoothness);
                             
                             // start stopwatch for the cache
                             configurableMaterial.cachedTextureStopWatch.Restart();
                         }
 
-
-                    configurableMaterial.prevOverrideEnable = overrideEnable;
-                    configurableMaterial.prevTextureVariant = textureVariant;
-                    configurableMaterial.prevTextureBrightness = textureBrightness;
-                    configurableMaterial.prevTextureHue = textureHue;
-                    configurableMaterial.prevTextureOpacity = textureOpacity;
-                    configurableMaterial.prevTextureSmoothness = textureSmoothness;
-                }
+                        configurableMaterial.prevOverrideEnable = overrideEnable;
+                        configurableMaterial.prevTextureVariant = textureVariant;
+                        configurableMaterial.prevTextureBrightness = textureBrightness;
+                        configurableMaterial.prevTextureHue = textureHue;
+                        configurableMaterial.prevTextureOpacity = textureOpacity;
+                        configurableMaterial.prevTextureSmoothness = textureSmoothness;
+                    }
                 }
             }
 
@@ -674,8 +679,8 @@ namespace RoadVisualTweaks.Systems
                 string name = pair1.Key;
                 ConfigurableMaterial configurableMaterial = pair1.Value;
 
-                Texture2D colorTexture = configurableMaterial.vanillaColorTexture;
-                Texture2D normalTexture = configurableMaterial.vanillaNormalTexture;
+                Texture2D colorTexture = configurableMaterial.VanillaColorTexture;
+                Texture2D normalTexture = configurableMaterial.VanillaNormalTexture;
 
                 Mod.log.Info($"processing {name}");
 
@@ -1105,7 +1110,7 @@ namespace RoadVisualTweaks.Systems
 
 
             // Create a new readable Texture2D to copy the pixels to it
-            Texture2D myTexture2D = new Texture2D(texture.width, texture.height);//, TextureFormat.RGBA32, true, false);
+            Texture2D myTexture2D = new(texture.width, texture.height);//, TextureFormat.RGBA32, true, false);
 
 
             // Copy the pixels from the RenderTexture to the new Texture
@@ -1195,14 +1200,14 @@ namespace RoadVisualTweaks.Systems
 
             foreach (KeyValuePair<string, ConfigurableMaterial> pair in configurableMaterials)
             {
-                if (pair.Value.generatedColorTexture != null)
+                if (pair.Value.GeneratedColorTexture != null)
                 {
-                    UnityEngine.Object.Destroy(pair.Value.generatedColorTexture);
+                    UnityEngine.Object.Destroy(pair.Value.GeneratedColorTexture);
                 }
 
-                if (pair.Value.generatedNormalTexture != null)
+                if (pair.Value.GeneratedNormalTexture != null)
                 {
-                    UnityEngine.Object.Destroy(pair.Value.generatedNormalTexture);
+                    UnityEngine.Object.Destroy(pair.Value.GeneratedNormalTexture);
                 }
             }
         }

@@ -100,6 +100,10 @@ namespace RoadVisualTweaks
 
         [SettingsUISlider(min = 0, max = 1.0f, step = 0.01f, scalarMultiplier = 1.0f, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(kSection, kConfigureBusLaneGroup)]
+        public float BusLaneTextureOpacity { get; set; }
+
+        [SettingsUISlider(min = 0, max = 1.0f, step = 0.01f, scalarMultiplier = 1.0f, unit = Unit.kFloatTwoFractions)]
+        [SettingsUISection(kSection, kConfigureBusLaneGroup)]
         public float BusLaneTextureHue { get; set; }
 
         [SettingsUISlider(min = 0, max = 1.0f, step = 0.01f, scalarMultiplier = 1.0f, unit = Unit.kFloatTwoFractions)]
@@ -119,6 +123,10 @@ namespace RoadVisualTweaks
         [SettingsUISlider(min = 0, max = 2.0f, step = 0.01f, scalarMultiplier = 1.0f, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(kSection, kConfigureBicycleLaneGroup)]
         public float BicycleLaneTextureBrightness { get; set; }
+
+        [SettingsUISlider(min = 0, max = 1.0f, step = 0.01f, scalarMultiplier = 1.0f, unit = Unit.kFloatTwoFractions)]
+        [SettingsUISection(kSection, kConfigureBicycleLaneGroup)]
+        public float BicycleLaneTextureOpacity { get; set; }
 
         [SettingsUISlider(min = 0, max = 1.0f, step = 0.01f, scalarMultiplier = 1.0f, unit = Unit.kFloatTwoFractions)]
         [SettingsUISection(kSection, kConfigureBicycleLaneGroup)]
@@ -159,12 +167,14 @@ namespace RoadVisualTweaks
             BusLaneTextureVariant = TextureVariantEnum.Vanilla;
             BusLaneTextureBrightness = 1.0f;
             BusLaneTextureHue = 0.15f;
+            BusLaneTextureOpacity = 1.0f;
             BusLaneTextureSmoothness = 1.0f;
 
             BicycleLaneOverrideEnable = false;
             BicycleLaneTextureVariant = TextureVariantEnum.Vanilla;
             BicycleLaneTextureBrightness = 1.0f;
             BicycleLaneTextureHue = 0.15f;
+            BicycleLaneTextureOpacity = 1.0f;
             BicycleLaneTextureSmoothness = 1.0f;
 
             UpdateMaterialsAndTextures();
@@ -274,6 +284,9 @@ namespace RoadVisualTweaks
                 { m_Setting.GetOptionLabelLocaleID(nameof(Setting.BusLaneTextureBrightness)), textureBrightnessLabelString },
                 { m_Setting.GetOptionDescLocaleID(nameof(Setting.BusLaneTextureBrightness)), textureBrightnessDescString },
 
+                { m_Setting.GetOptionLabelLocaleID(nameof(Setting.BusLaneTextureOpacity)), textureOpacityLabelString },
+                { m_Setting.GetOptionDescLocaleID(nameof(Setting.BusLaneTextureOpacity)), textureOpacityDescString },
+
                 { m_Setting.GetOptionLabelLocaleID(nameof(Setting.BusLaneTextureHue)), textureHueLabelString },
                 { m_Setting.GetOptionDescLocaleID(nameof(Setting.BusLaneTextureHue)), textureHueDescString},
 
@@ -289,6 +302,9 @@ namespace RoadVisualTweaks
 
                 { m_Setting.GetOptionLabelLocaleID(nameof(Setting.BicycleLaneTextureBrightness)), textureBrightnessLabelString },
                 { m_Setting.GetOptionDescLocaleID(nameof(Setting.BicycleLaneTextureBrightness)), textureBrightnessDescString},
+
+                { m_Setting.GetOptionLabelLocaleID(nameof(Setting.BicycleLaneTextureOpacity)), textureOpacityLabelString },
+                { m_Setting.GetOptionDescLocaleID(nameof(Setting.BicycleLaneTextureOpacity)), textureOpacityDescString },
 
                 { m_Setting.GetOptionLabelLocaleID(nameof(Setting.BicycleLaneTextureHue)), textureHueLabelString },
                 { m_Setting.GetOptionDescLocaleID(nameof(Setting.BicycleLaneTextureHue)), textureHueDescString},
