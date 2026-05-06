@@ -159,6 +159,23 @@ namespace RoadVisualTweaks.Systems
             {
                 Mod.log.Info("user is in Game or Editor mode");
                 inGameOrEditor = true;
+
+                // Reset material tracking state so materials are re-obtained for the new game session.
+                // Without this, loading a new save within the same session leaves obtainedMaterial=true
+                // from the previous session, causing ObtainMaterialsAndTexturesReferences() to skip
+                // re-discovering the new session's batch materials, so saved settings are never applied.
+                foreach (ConfigurableMaterial cm in configurableMaterials.Values)
+                {
+                    cm.obtainedMaterial = false;
+                    cm.obtainedMaterialReplaced = false;
+                    cm.prevOverrideEnable = null;
+                    cm.prevTextureVariant = null;
+                    cm.prevTextureBrightness = null;
+                    cm.prevTextureHue = null;
+                    cm.prevTextureOpacity = null;
+                    cm.prevTextureSmoothness = null;
+                }
+                batchedMaterialCount = 0;
             } else
             {
                 Mod.log.Info("user is not in Game or Editor mode");
